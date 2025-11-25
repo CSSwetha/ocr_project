@@ -94,8 +94,8 @@ if uploaded_file:
 
 with st.expander("✨ Advanced Features"):
 
-    # 🔹 Extract Again With Language Selection
-    if st.checkbox("📝 Extract Text with Language Selection"):
+    # ---------------- Extract Again With Language Selection ----------------
+    if st.checkbox("📝 Extract Text with Language Selection", key="lang"):
         langs = {
             "English": "eng", "Hindi": "hin", "Tamil": "tam", "Telugu": "tel",
             "Kannada": "kan", "French": "fra", "German": "deu", "Spanish": "spa"
@@ -106,31 +106,28 @@ with st.expander("✨ Advanced Features"):
         new_text = pytesseract.image_to_string(Image.open(image_path), lang=code)
         st.text_area("📟 Extracted Text", new_text, height=200)
 
-        if st.checkbox("🌍 Translate to English"):
+        if st.checkbox("🌍 Translate to English", key="translate"):
             detected = detect(new_text)
             translated = GoogleTranslator(source=detected, target="en").translate(new_text)
             st.success(f"Detected language: {detected}")
             st.text_area("📘 Translation", translated, height=200)
 
-
-    # 🔹 Image Inversion
-    if st.checkbox("🌓 Invert Image Colors"):
+    # ---------------- Invert Colors ----------------
+    if st.checkbox("🌓 Invert Image Colors", key="invert"):
         img = cv2.imread(image_path)
         inverted = cv2.bitwise_not(img)
         cv2.imwrite("inverted.png", inverted)
-        st.image("inverted.png")
+        st.image("inverted.png", caption="Inverted Image Preview")
 
-
-    # 🔹 Binarization
-    if st.checkbox("🖼 Binarization (Otsu Thresholding)"):
+    # ---------------- Binarization ----------------
+    if st.checkbox("⚫ Binary Thresholding (Otsu)", key="binary"):
         img = cv2.imread(image_path, 0)
         _, bin_img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         cv2.imwrite("binary.png", bin_img)
-        st.image("binary.png")
+        st.image("binary.png", caption="Binarized Image")
 
-
-    # 🔹 Deskew
-    if st.checkbox("🧭 Deskew Text"):
+    # ---------------- Deskew ----------------
+    if st.checkbox("📐 Deskew Image Alignment", key="deskew"):
         img = cv2.imread(image_path)
 
         def get_skew(img):
@@ -142,30 +139,36 @@ with st.expander("✨ Advanced Features"):
             return -(90 + angle) if angle < -45 else -angle
 
         angle = get_skew(img)
-        rotated = cv2.warpAffine(img, cv2.getRotationMatrix2D((img.shape[1]//2, img.shape[0]//2), angle, 1),
-                                 (img.shape[1], img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
+        rotated = cv2.warpAffine(img,
+            cv2.getRotationMatrix2D((img.shape[1]//2, img.shape[0]//2), angle, 1),
+            (img.shape[1], img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
 
         cv2.imwrite("deskewed.png", rotated)
-        st.image("deskewed.png")
+        st.image("deskewed.png", caption=f"Deskewed (Angle: {round(angle,2)}°)")
 
-
-    # 🔤 Font Thickness Adjustment
-if st.checkbox("🔤 Font Thickness Adjustment"):
-    img = cv2.imread(image_path, 0)
-
-    if img is None:
-        st.error("⚠️ Unable to load image for thickness adjustment.")
-    else:
+    # ---------------- Font Thickness ----------------
+    if st.checkbox("🔤 Font Thickness Adjustment", key="thickness"):
+        img = cv2.imread(image_path, 0)
         blurred = cv2.medianBlur(img, 3)
 
         thin = cv2.erode(blurred, np.ones((2,2),np.uint8), iterations=1)
         thick = cv2.dilate(blurred, np.ones((2,2),np.uint8), iterations=1)
 
-        st.image(thin, caption="✏️ Thin Text")
-        st.image(thick, caption="🖍️ Thick Text")
+        st.image(thin, caption="✏️ Thin Text Result")
+        st.image(thick, caption="🖍 Thick Text Result")
 
-
-    # 🔹 Remove Borders
-if st.checkbox("🧹 Remove Borders"):
+    # ---------------- Remove Borders (Repaired Logic) ----------------
+    if st.checkbox("🧹 Remove Borders", key="remove_border"):
         img = cv2.imread(image_path)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
+        # Create threshold mask
+        _, thresh = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
+
+        # Find bounding box of text (largest contour)
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        x, y, w, h = cv2.boundingRect(max(contours, key=cv2.contourArea))
+
+        cropped = img[y:y+h, x:x+w]
+        cv2.imwrite("borderless.png", cropped)
+        st.image("borderless.png", caption="Border Removed Output")
