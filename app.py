@@ -149,9 +149,13 @@ with st.expander("✨ Advanced Features"):
         st.image("deskewed.png")
 
 
-    # 🔹 Font Thickness Adjust
-    if st.checkbox("🔤 Font Thickness Adjustment"):
-        img = cv2.imread(image_path, 0)
+    # 🔤 Font Thickness Adjustment
+if st.checkbox("🔤 Font Thickness Adjustment"):
+    img = cv2.imread(image_path, 0)
+
+    if img is None:
+        st.error("⚠️ Unable to load image for thickness adjustment.")
+    else:
         blurred = cv2.medianBlur(img, 3)
 
         thin = cv2.erode(blurred, np.ones((2,2),np.uint8), iterations=1)
