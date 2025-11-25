@@ -2,3 +2,5 @@ tesseract-ocr
 tesseract-ocr-eng
 tesseract-ocr-hin
 tesseract-ocr-tam
+tesseract-ocr-tel
+tesseract-ocr-kan
