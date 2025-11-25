@@ -1,5 +1,4 @@
 import streamlit as st
-import pytesseract
 from pdf2image import convert_from_path
 import os
 import cv2
@@ -8,6 +7,15 @@ from PIL import Image
 from deep_translator import GoogleTranslator
 from langdetect import detect, DetectorFactory
 import platform
+import pytesseract
+
+# Detect operating system and assign tesseract path
+if platform.system() == "Windows":
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+elif platform.system() == "Darwin":  # macOS
+    pytesseract.pytesseract.tesseract_cmd = "/usr/local/bin/tesseract"
+else:  # Linux/Streamlit Cloud
+    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
 DetectorFactory.seed = 0  # deterministic language detection
 
