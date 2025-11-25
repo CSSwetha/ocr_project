@@ -163,4 +163,5 @@ with st.expander("✨ Advanced Features"):
 
     # 🔹 Remove Borders
     if st.checkbox("🧹 Remove Borders"):
-        img = cv2.i
+        img = cv2.imread(image_path)
+
