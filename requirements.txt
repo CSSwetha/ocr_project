@@ -2,8 +2,11 @@ streamlit
 numpy
 pillow
 pdf2image
-opencv-python-headless
-pytesseract
-deep-translator
 langdetect
 easyocr
+pytesseract
+opencv-python-headless
+Pillow
+deep-translator
+
+
