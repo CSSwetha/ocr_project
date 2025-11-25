@@ -158,17 +158,50 @@ with st.expander("✨ Advanced Features"):
         st.image(thick, caption="🖍 Thick Text Result")
 
     # ---------------- Remove Borders (Repaired Logic) ----------------
-    if st.checkbox("🧹 Remove Borders", key="remove_border"):
-        img = cv2.imread(image_path)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    if st.checkbox("🧹 Remove Borders (Lines) from Image"):
+        if image_path:
+            with st.spinner("🧼 Removing all lines and borders with improved accuracy..."):
+                # Load image
+                img = cv2.imread(image_path)
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # Create threshold mask
-        _, thresh = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
+                # Step 1: Create binary inverted image to enhance contrast
+                bin_img = cv2.adaptiveThreshold(~gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, 
+                                                cv2.THRESH_BINARY, 15, -2)
 
-        # Find bounding box of text (largest contour)
-        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        x, y, w, h = cv2.boundingRect(max(contours, key=cv2.contourArea))
+                # Step 2: Detect horizontal lines
+                horizontal = bin_img.copy()
+                cols = horizontal.shape[1]
+                horizontal_size = max(1, cols // 20)  # Stronger kernel
+                horizontalStructure = cv2.getStructuringElement(cv2.MORPH_RECT, (horizontal_size, 1))
+                horizontal = cv2.erode(horizontal, horizontalStructure)
+                horizontal = cv2.dilate(horizontal, horizontalStructure)
 
-        cropped = img[y:y+h, x:x+w]
-        cv2.imwrite("borderless.png", cropped)
-        st.image("borderless.png", caption="Border Removed Output")
+                # Step 3: Detect vertical lines
+                vertical = bin_img.copy()
+                rows = vertical.shape[0]
+                vertical_size = max(1, rows // 20)  # Stronger kernel
+                verticalStructure = cv2.getStructuringElement(cv2.MORPH_RECT, (1, vertical_size))
+                vertical = cv2.erode(vertical, verticalStructure)
+                vertical = cv2.dilate(vertical, verticalStructure)
+
+                # Step 4: Combine both masks
+                mask = cv2.add(horizontal, vertical)
+
+                # Step 5: Dilate mask to ensure even faint lines are caught
+                kernel = np.ones((3, 3), np.uint8)
+                mask = cv2.dilate(mask, kernel, iterations=2)
+
+                # Step 6: Inpaint to remove lines
+                cleaned = cv2.inpaint(img, mask, 5, cv2.INPAINT_TELEA)
+
+                # Save and display
+                border_removed_path = "border_removed_strict.png"
+                cv2.imwrite(border_removed_path, cleaned)
+
+                st.image(border_removed_path, caption="🧼 Cleaned Image - No Borders or Lines", use_container_width=True)
+
+                with open(border_removed_path, "rb") as f:
+                    st.download_button("📥 Download Cleaned Image", f, "border_removed_strict.png", mime="image/png")
+        else:
+            st.warning("⚠️ No image found to remove borders.")
