@@ -10,6 +10,13 @@ from langdetect import detect, DetectorFactory
 import platform
 import shutil
 DetectorFactory.seed = 0  # deterministic language detection
+# -------- PDF OCR Function --------
+def extract_text_from_pdf(pdf_path):
+    text_output = ""
+    pages = convert_from_path(pdf_path, dpi=300)
+    for page in pages:
+        text_output += pytesseract.image_to_string(page)
+    return text_output
 
 # --------- AUTO TESSERACT CONFIG ---------
 def configure_tesseract():
