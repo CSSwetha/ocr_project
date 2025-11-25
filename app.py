@@ -166,6 +166,6 @@ if st.checkbox("🔤 Font Thickness Adjustment"):
 
 
     # 🔹 Remove Borders
-    if st.checkbox("🧹 Remove Borders"):
+if st.checkbox("🧹 Remove Borders"):
         img = cv2.imread(image_path)
 
