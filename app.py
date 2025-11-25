@@ -9,6 +9,42 @@ from deep_translator import GoogleTranslator
 from langdetect import detect, DetectorFactory
 import platform
 import shutil
+DetectorFactory.seed = 0  # deterministic language detection
+
+# --------- AUTO TESSERACT CONFIG ---------
+def configure_tesseract():
+    system = platform.system()
+    paths = {
+        "Linux": ["/usr/bin/tesseract", "/usr/local/bin/tesseract"],
+        "Darwin": ["/opt/homebrew/bin/tesseract", "/usr/local/bin/tesseract"],
+        "Windows": [
+            r"C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
+            r"C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe"
+        ]
+    }
+    for p in paths.get(system, []):
+        if os.path.exists(p) or shutil.which(p):
+            pytesseract.pytesseract.tesseract_cmd = p
+            return True
+    return False
+
+if not configure_tesseract():
+    st.error("❌ Tesseract not detected. Ensure packages.txt includes: tesseract-ocr, tesseract-ocr-eng.")
+    st.stop()
+
+st.success(f"✔ Tesseract detected: {pytesseract.get_tesseract_version()}")
+
+# -------- STREAMLIT UI -------- as st
+import pytesseract
+from pdf2image import convert_from_path
+import os
+import cv2
+import numpy as np
+from PIL import Image
+from deep_translator import GoogleTranslator
+from langdetect import detect, DetectorFactory
+import platform
+import shutil
 
 DetectorFactory.seed = 0
 
