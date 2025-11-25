@@ -1,4 +1,5 @@
 import streamlit as st
+import pytesseract
 from pdf2image import convert_from_path
 import os
 import cv2
@@ -7,43 +8,39 @@ from PIL import Image
 from deep_translator import GoogleTranslator
 from langdetect import detect, DetectorFactory
 import platform
-import pytesseract
+import shutil
 
-# Detect operating system and assign tesseract path
-if platform.system() == "Windows":
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-elif platform.system() == "Darwin":  # macOS
-    pytesseract.pytesseract.tesseract_cmd = "/usr/local/bin/tesseract"
-else:  # Linux/Streamlit Cloud
-    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+DetectorFactory.seed = 0
 
-DetectorFactory.seed = 0  # deterministic language detection
-
-# ------------------------------------------
-# 🔧 Auto Setup for Tesseract (Linux/Cloud)
-# ------------------------------------------
-def setup_tesseract():
+# --------- TESSERACT AUTO-CONFIGURATION ---------
+def configure_tesseract():
     system = platform.system()
 
-    if system == "Windows":
-        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    if system == "Linux":
+        candidates = ["/usr/bin/tesseract", "/usr/local/bin/tesseract"]
+    elif system == "Darwin":
+        candidates = ["/usr/local/bin/tesseract", "/opt/homebrew/bin/tesseract"]
+    else:  # Windows
+        candidates = [
+            r"C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
+            r"C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe"
+        ]
 
-    elif system == "Darwin":   # macOS
-        pytesseract.pytesseract.tesseract_cmd = "/usr/local/bin/tesseract"
+    for path in candidates:
+        if shutil.which(path) or os.path.exists(path):
+            pytesseract.pytesseract.tesseract_cmd = path
+            return True
 
-    else:  # Linux (Streamlit cloud)
-        pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
-        # Install if missing
-        if not os.path.exists("/usr/bin/tesseract"):
-            os.system("sudo apt-get update")
-            os.system("sudo apt-get install -y tesseract-ocr")
-            os.system("sudo apt-get install -y tesseract-ocr-eng tesseract-ocr-hin")
+    return False
 
-setup_tesseract()
+# Run setup
+if not configure_tesseract():
+    st.error("❌ Tesseract OCR is not installed or not detected. Ensure installation or include in packages.txt for deployment.")
+    st.stop()
+else:
+    st.success(f"Tesseract Detected ✔ Version: {pytesseract.get_tesseract_version()}")
 
-# ------------------------------------------
-# Streamlit App UI
-# ------------------------------------------
+# -------- UI CONFIG --------
 st.set_page_config(page_title="OCRify LENS", layout="centered")
 
 st.markdown("""
@@ -51,103 +48,75 @@ st.markdown("""
 <p style='text-align:center;'>Upload scanned documents to extract text and enhance images</p>
 """, unsafe_allow_html=True)
 
-uploaded_file = st.file_uploader("📄 Upload a scanned PDF or image", type=["pdf", "jpg", "jpeg", "png"])
-
+uploaded_file = st.file_uploader("📄 Upload PDF or Image", type=["pdf", "jpg", "jpeg", "png"])
 doc_text = ""
 image_path = ""
 
-# ------------------------------------------
-# OCR Helper for PDF
-# ------------------------------------------
-def extract_text_from_pdf(path):
-    text_output = ""
-    pages = convert_from_path(path, dpi=300)
+# -------- PDF TEXT EXTRACT --------
+def extract_pdf_text(pdf_path):
+    text = ""
+    pages = convert_from_path(pdf_path, dpi=300)
     for page in pages:
-        text_output += pytesseract.image_to_string(page)
-    return text_output
+        text += pytesseract.image_to_string(page)
+    return text
 
-# ------------------------------------------
-# File Processing
-# ------------------------------------------
+# -------- FILE HANDLING --------
 if uploaded_file:
-    file_ext = uploaded_file.name.split('.')[-1].lower()
+    ext = uploaded_file.name.split('.')[-1].lower()
 
-    if file_ext == 'pdf':
-        with open("temp_file.pdf", "wb") as f:
+    if ext == 'pdf':
+        with open("temp.pdf", "wb") as f:
             f.write(uploaded_file.read())
-
-        with st.spinner("🔍 Extracting text from PDF with OCR..."):
-            doc_text = extract_text_from_pdf("temp_file.pdf")
-
-        first_page = convert_from_path("temp_file.pdf", dpi=300)[0]
+        with st.spinner("🔍 Extracting PDF text..."):
+            doc_text = extract_pdf_text("temp.pdf")
+        preview = convert_from_path("temp.pdf", dpi=300)[0]
         image_path = "preview.png"
-        first_page.save(image_path)
+        preview.save(image_path)
 
-    elif file_ext in ['jpg', 'jpeg', 'png']:
-        image_path = "uploaded_image." + file_ext
+    else:
+        image_path = f"input.{ext}"
         with open(image_path, "wb") as f:
             f.write(uploaded_file.read())
-
         with st.spinner("🔍 Extracting text from image..."):
-            img = Image.open(image_path)
-            doc_text = pytesseract.image_to_string(img)
+            doc_text = pytesseract.image_to_string(Image.open(image_path))
 
-    st.success("✅ OCR processing complete!")
+    st.success("✅ OCR Completed!")
+    st.image(image_path, caption="🖼 Uploaded File Preview", width=400)
 
-    st.image(image_path, caption="🖼️ Uploaded Image", width=400)
+# -------- OPTIONS PANEL --------
+with st.expander("✨ More Options"):
 
-# ------------------------------------------
-# Feature Options
-# ------------------------------------------
+    if st.checkbox("📝 Extract OCR Text Again"):
+        langs = {
+            "English": "eng", "Hindi": "hin", "Tamil": "tam", "Telugu": "tel",
+            "Kannada": "kan", "French": "fra", "German": "deu", "Spanish": "spa"
+        }
+        selected = st.multiselect("🌐 Choose Language(s)", list(langs.keys()), default=["English"])
+        lang_code = "+".join([langs[l] for l in selected])
 
-with st.expander("✨ Featurization Options"):
-    if st.checkbox("📝 Extract Text"):
-        if image_path:
-            available_langs = {
-                "English": "eng", "Hindi": "hin", "Telugu": "tel", "Tamil": "tam",
-                "Kannada": "kan", "Gujarati": "guj", "Marathi": "mar", "Punjabi": "pan",
-                "Urdu": "urd", "French": "fra", "German": "deu", "Spanish": "spa"
-            }
-            selected_langs = st.multiselect("🌐 Select OCR languages", list(available_langs.keys()), default=["English"])
-            selected_codes = "+".join([available_langs[lang] for lang in selected_langs])
+        try:
+            new_text = pytesseract.image_to_string(Image.open(image_path), lang=lang_code)
+            st.text_area("📟 Extracted Text", new_text, height=200)
 
-            try:
-                img = Image.open(image_path)
-                extracted_text = pytesseract.image_to_string(img, lang=selected_codes)
-                st.text_area("📟 Extracted Text", extracted_text, height=200)
-
-                if st.checkbox("🌍 Translate to English"):
-                    detected_lang = detect(extracted_text)
-                    translated = GoogleTranslator(source=detected_lang, target='en').translate(extracted_text)
-                    st.text(f"Detected language: {detected_lang}")
-                    st.text_area("📘 Translation", translated, height=200)
-
-            except Exception as e:
-                st.error(f"❌ OCR Error: {e}")
-        else:
-            st.warning("⚠️ Upload an image first.")
+            if st.checkbox("🌍 Translate to English"):
+                detected = detect(new_text)
+                translated = GoogleTranslator(source=detected, target="en").translate(new_text)
+                st.text_area("📘 Translation", translated, height=200)
+        except Exception as e:
+            st.error(f"❌ OCR Failed: {e}")
 
     if st.checkbox("🌓 Invert Colors"):
-        if image_path:
-            img = cv2.imread(image_path)
-            inverted = cv2.bitwise_not(img)
-            path = "inverted.png"
-            cv2.imwrite(path, inverted)
-            st.image(path)
-        else:
-            st.warning("⚠️ No image found.")
+        img = cv2.imread(image_path)
+        inv = cv2.bitwise_not(img)
+        path = "inverted.png"
+        cv2.imwrite(path, inv)
+        st.image(path)
 
+    if st.checkbox("🖼 Binarize Image"):
+        img = cv2.imread(image_path, 0)
+        _, binary = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        path = "binary.png"
+        cv2.imwrite(path, binary)
+        st.image(path)
 
-    if st.checkbox("🖼️ Binarization"):
-        if image_path:
-            img = cv2.imread(image_path, 0)
-            _, bin_img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            path = "binary.png"
-            cv2.imwrite(path, bin_img)
-            st.image(path)
-        else:
-            st.warning("⚠️ Upload an image first.")
-
-st.success("🚀 App Ready!")
-
-
+st.success("🚀 App Ready and Working ✔")
