@@ -1,12 +1,7 @@
 streamlit
-numpy
-pillow
-pdf2image
-langdetect
-easyocr
 pytesseract
-opencv-python-headless
 Pillow
+opencv-python-headless
+pdf2image
 deep-translator
-
-
+langdetect
